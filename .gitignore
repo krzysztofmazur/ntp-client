@@ -1,0 +1,10 @@
+composer.lock
+composer.phar
+vendor
+
+#Intellij
+.idea/*
+*.iml
+
+#.DS_Store
+.DS_Store
