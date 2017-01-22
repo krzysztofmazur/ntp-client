@@ -13,6 +13,6 @@ namespace KrzysztofMazur\NTPClient\Exception;
 /**
  * @author Krzysztof Mazur <krz@ychu.pl>
  */
-class UnableToConnectException extends ConnectionException
+class ConnectionRefusedException extends ConnectionException
 {
 }
