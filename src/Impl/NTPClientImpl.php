@@ -52,10 +52,9 @@ class NTPClientImpl implements NTPClient
     /**
      * @param string $server
      * @param int $port
-     * @param int $timeout
      * @param int $protocol
      */
-    public function __construct(string $server, int $port, int $timeout = 5, int $protocol = self::USE_UDP)
+    public function __construct(string $server, int $port, int $protocol = self::USE_UDP)
     {
         if (empty($server)) {
             throw new \InvalidArgumentException(sprintf("Empty server address given: %s", $server));
@@ -63,14 +62,25 @@ class NTPClientImpl implements NTPClient
         if ($port < 1 || $port > 65535) {
             throw new \InvalidArgumentException(sprintf("Invalid port: %d", $port));
         }
-        if ($timeout < 0) {
-            throw new \InvalidArgumentException(sprintf("Negative timeout given: %d", $timeout));
+        if (!in_array($protocol, [self::USE_UDP, self::USE_TCP])) {
+            throw new \InvalidArgumentException("Invalid protocol parameter");
         }
 
         $this->server = $server;
         $this->port = $port;
-        $this->timeout = $timeout;
         $this->protocol = $protocol;
+        $this->timeout = 5;
+    }
+
+    /**
+     * @param int $timeout
+     */
+    public function setTimeout(int $timeout)
+    {
+        if ($timeout < 0) {
+            throw new \InvalidArgumentException(sprintf("Negative timeout given: %d", $timeout));
+        }
+        $this->timeout = $timeout;
     }
 
     /**
@@ -87,9 +97,18 @@ class NTPClientImpl implements NTPClient
      */
     public function getUnixTime(): int
     {
-        return $this->protocol === self::USE_UDP
-            ? $this->getUnixTimeUDP()
-            : 0;
+        return $this->protocol === self::USE_UDP ? $this->getUnixTimeUDP() : $this->getUnixTimeTCP();
+    }
+
+    /**
+     * @return int
+     */
+    private function getUnixTimeTCP(): int
+    {
+        $socket = $this->connect();
+        var_dump($this->readResponse($socket, 48));
+
+        return 0;
     }
 
     /**
@@ -99,7 +118,7 @@ class NTPClientImpl implements NTPClient
     {
         $socket = $this->connect();
         $this->sendInitPackage($socket);
-        $response = $this->readResponse($socket);
+        $response = $this->readResponse($socket, 48);
         $this->close($socket);
 
         return $this->extractTime($response);
@@ -110,7 +129,7 @@ class NTPClientImpl implements NTPClient
      */
     private function getConnectionString(): string
     {
-        return sprintf("udp://%s:%s", $this->server, $this->port);
+        return sprintf("%s://%s:%s", $this->protocol === self::USE_UDP ? 'udp' : 'tcp', $this->server, $this->port);
     }
 
     /**
@@ -119,7 +138,7 @@ class NTPClientImpl implements NTPClient
      */
     private function connect()
     {
-        $socket = stream_socket_client($this->getConnectionString(), $errorCode, $errorString, $this->timeout);
+        $socket = @stream_socket_client($this->getConnectionString(), $errorCode, $errorString, $this->timeout);
         if (!$socket) {
             throw new UnableToConnectException($errorString, $errorCode);
         }
@@ -151,12 +170,13 @@ class NTPClientImpl implements NTPClient
 
     /**
      * @param resource $socket
+     * @param int $length
      * @return string
      * @throws InvalidResponseException
      */
-    private function readResponse($socket)
+    private function readResponse($socket, int $length)
     {
-        $response = fread($socket, 48);
+        $response = fread($socket, $length);
         if ($response === false || $response === '') {
             throw new InvalidResponseException("Unable to read response, or response is empty");
         }
