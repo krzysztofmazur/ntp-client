@@ -120,8 +120,9 @@ abstract class AbstractNtpClient implements NtpClient
      */
     protected function readResponse($socket, int $length)
     {
+        socket_set_timeout($socket, $this->timeout);
         $response = fread($socket, $length);
-        if ($response === false || $response === '') {
+        if ($response === false || empty($response)) {
             throw new InvalidResponseException("Unable to read response, or response is empty");
         }
 
