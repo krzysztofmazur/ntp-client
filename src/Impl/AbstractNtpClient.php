@@ -14,19 +14,13 @@ use KrzysztofMazur\NTPClient\Exception\ConnectionRefusedException;
 use KrzysztofMazur\NTPClient\Exception\ConnectionTimeoutException;
 use KrzysztofMazur\NTPClient\Exception\InvalidResponseException;
 use KrzysztofMazur\NTPClient\Exception\UnableToConnectException;
-use KrzysztofMazur\NTPClient\NTPClient;
+use KrzysztofMazur\NTPClient\NtpClient;
 
 /**
  * @author Krzysztof Mazur <krz@ychu.pl>
  */
-class NTPClientImpl implements NTPClient
+abstract class AbstractNtpClient implements NtpClient
 {
-    /**
-     * Protocols
-     */
-    const USE_UDP = 0;
-    const USE_TCP = 1;
-
     /**
      * Value from RFC868
      */
@@ -35,29 +29,23 @@ class NTPClientImpl implements NTPClient
     /**
      * @var string
      */
-    private $server;
+    protected $server;
 
     /**
      * @var int
      */
-    private $port;
+    protected $port;
 
     /**
      * @var int
      */
-    private $timeout;
-
-    /**
-     * @var int
-     */
-    private $protocol;
+    protected $timeout;
 
     /**
      * @param string $server
      * @param int $port
-     * @param int $protocol
      */
-    public function __construct(string $server, int $port, int $protocol = self::USE_UDP)
+    public function __construct(string $server, int $port)
     {
         if (empty($server)) {
             throw new \InvalidArgumentException(sprintf("Empty server address given: %s", $server));
@@ -65,13 +53,9 @@ class NTPClientImpl implements NTPClient
         if ($port < 1 || $port > 65535) {
             throw new \InvalidArgumentException(sprintf("Invalid port: %d", $port));
         }
-        if (!in_array($protocol, [self::USE_UDP, self::USE_TCP])) {
-            throw new \InvalidArgumentException("Invalid protocol parameter");
-        }
 
         $this->server = $server;
         $this->port = $port;
-        $this->protocol = $protocol;
         $this->timeout = 5;
     }
 
@@ -96,53 +80,15 @@ class NTPClientImpl implements NTPClient
     }
 
     /**
-     * @return int
-     */
-    public function getUnixTime(): int
-    {
-        $value = $this->protocol === self::USE_UDP ? $this->getUnixTimeUDP() : $this->getUnixTimeTCP();
-
-        return $value - self::SINCE_1900_TO_UNIX;
-    }
-
-    /**
-     * @return int
-     */
-    private function getUnixTimeTCP(): int
-    {
-        $socket = $this->connect();
-        $response = $this->readResponse($socket, 4);
-        $this->close($socket);
-
-        return $this->bin2dec($response);
-    }
-
-    /**
-     * @return int
-     */
-    private function getUnixTimeUDP(): int
-    {
-        $socket = $this->connect();
-        $this->sendInitPackage($socket);
-        $response = $this->readResponse($socket, 48);
-        $this->close($socket);
-
-        return $this->extractTime($response);
-    }
-
-    /**
      * @return string
      */
-    private function getConnectionString(): string
-    {
-        return sprintf("%s://%s:%s", $this->protocol === self::USE_UDP ? 'udp' : 'tcp', $this->server, $this->port);
-    }
+    protected abstract function getConnectionString(): string;
 
     /**
      * @return resource
      * @throws UnableToConnectException
      */
-    private function connect()
+    protected function connect()
     {
         $socket = @stream_socket_client($this->getConnectionString(), $errorCode, $errorString, $this->timeout);
         if (!$socket) {
@@ -158,7 +104,7 @@ class NTPClientImpl implements NTPClient
      * @throws ConnectionRefusedException
      * @throws ConnectionTimeoutException
      */
-    private function checkMetadata($socket)
+    protected function checkMetadata($socket)
     {
         $metadata = stream_get_meta_data($socket);
         if ($metadata['timed_out']) {
@@ -168,19 +114,11 @@ class NTPClientImpl implements NTPClient
 
     /**
      * @param resource $socket
-     */
-    private function sendInitPackage($socket)
-    {
-        fwrite($socket, chr(0x1B) . str_repeat(chr(0x00), 47));
-    }
-
-    /**
-     * @param resource $socket
      * @param int $length
      * @return string
      * @throws InvalidResponseException
      */
-    private function readResponse($socket, int $length)
+    protected function readResponse($socket, int $length)
     {
         $response = fread($socket, $length);
         if ($response === false || $response === '') {
@@ -193,32 +131,8 @@ class NTPClientImpl implements NTPClient
     /**
      * @param resource $socket
      */
-    private function close($socket)
+    protected function close($socket)
     {
         @fclose($socket);
-    }
-
-    /**
-     * @param string $response
-     * @return int
-     * @throws InvalidResponseException
-     */
-    private function extractTime(string $response): int
-    {
-        $unpacked = @unpack('N12', $response);
-        if (!($unpacked && isset($unpacked[9]))) {
-            throw new InvalidResponseException("Unable to unpack response");
-        }
-
-        return $unpacked[9];
-    }
-
-    /**
-     * @param string $value
-     * @return int
-     */
-    private function bin2dec(string $value): int
-    {
-        return hexdec(bin2hex($value));
     }
 }

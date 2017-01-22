@@ -17,7 +17,7 @@ use KrzysztofMazur\NTPClient\Exception\UnableToConnectException;
 /**
  * @author Krzysztof Mazur <krz@ychu.pl>
  */
-interface NTPClient
+interface NtpClient
 {
     /**
      * @return int
