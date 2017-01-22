@@ -21,6 +21,9 @@ use KrzysztofMazur\NTPClient\NTPClient;
  */
 class NTPClientImpl implements NTPClient
 {
+    /**
+     * Protocols
+     */
     const USE_UDP = 0;
     const USE_TCP = 1;
 
@@ -97,7 +100,9 @@ class NTPClientImpl implements NTPClient
      */
     public function getUnixTime(): int
     {
-        return $this->protocol === self::USE_UDP ? $this->getUnixTimeUDP() : $this->getUnixTimeTCP();
+        $value = $this->protocol === self::USE_UDP ? $this->getUnixTimeUDP() : $this->getUnixTimeTCP();
+
+        return $value - self::SINCE_1900_TO_UNIX;
     }
 
     /**
@@ -106,9 +111,10 @@ class NTPClientImpl implements NTPClient
     private function getUnixTimeTCP(): int
     {
         $socket = $this->connect();
-        var_dump($this->readResponse($socket, 48));
+        $response = $this->readResponse($socket, 4);
+        $this->close($socket);
 
-        return 0;
+        return $this->bin2dec($response);
     }
 
     /**
@@ -204,6 +210,15 @@ class NTPClientImpl implements NTPClient
             throw new InvalidResponseException("Unable to unpack response");
         }
 
-        return $unpacked[9] - self::SINCE_1900_TO_UNIX;
+        return $unpacked[9];
+    }
+
+    /**
+     * @param string $value
+     * @return int
+     */
+    private function bin2dec(string $value): int
+    {
+        return hexdec(bin2hex($value));
     }
 }
