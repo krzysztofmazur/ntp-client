@@ -51,7 +51,7 @@ final class UdpNtpClient extends AbstractNtpClient
      */
     private function sendInitPackage($socket)
     {
-        fwrite($socket, chr(0x1B) . str_repeat(chr(0x00), 47));
+        @fwrite($socket, chr(0x1B) . str_repeat(chr(0x00), 47));
     }
 
     /**
