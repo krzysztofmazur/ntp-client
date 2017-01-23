@@ -49,7 +49,7 @@ class CompositeNtpClient implements NtpClient
             try {
                 return $client->getUnixTime();
             } catch (ConnectionException $e) {
-                continue;
+                //do nothing
             }
         }
 
@@ -61,6 +61,6 @@ class CompositeNtpClient implements NtpClient
      */
     public function getTime(\DateTimeZone $timezone = null): \DateTime
     {
-        return \DateTime::createFromFormat('U', $this->getTime(), $timezone);
+        return DateTimeConverter::createFromUnixTimestamp($this->getUnixTime(), $timezone);
     }
 }

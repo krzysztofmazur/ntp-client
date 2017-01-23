@@ -76,7 +76,7 @@ abstract class AbstractNtpClient implements NtpClient
      */
     public function getTime(\DateTimeZone $timezone = null): \DateTime
     {
-        return \DateTime::createFromFormat('U', $this->getUnixTime(), $timezone);
+        return DateTimeConverter::createFromUnixTimestamp($this->getUnixTime(), $timezone);
     }
 
     /**
